@@ -10,7 +10,7 @@
 (enable-console-print!)
 
 (let [{:keys [chsk ch-recv send-fn state]}
-      (sente/make-channel-socket! "/chsk" {:type :auto})]
+      (sente/make-channel-socket! "/chsk" {:type :ajax})]
   (def chsk chsk)
   (def ch-chsk ch-recv)
   (def chsk-send! send-fn)
@@ -19,12 +19,12 @@
 (defmulti event-msg-handler :id)
 
 (defn event-msg-handler* [{:as ev-msg :keys [id ?data event]}]
-  (debugf "Received event: %s" ev-msg)
+  (infof "Received event: %s" event)
   (event-msg-handler ev-msg))
 
 (defmethod event-msg-handler :default
   [{:as ev-msg :keys [event]}]
-  (warnf "Unhandled event: %s" event))
+  (errorf "Unhandled event: %s" event))
 
 (sente/start-chsk-router! ch-chsk event-msg-handler*)
 
