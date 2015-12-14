@@ -22,18 +22,19 @@
 
 (defn get-type [log]
   (if-let [type (:_type log)]
-    (-> type (.toLowerCase))
-    ""))
+    (-> type (.toLowerCase)) ""))
 
 (defn rtr? [log]
-  (="rtr" (get-type log)))
+  (= "rtr" (get-type log)))
 
 (defn app? [log]
-  (="app" (get-type log)))
+  (= "app" (get-type log)))
 
 (defn get-request-id [log]
   {:pre [log]}
-  (-> log :_source :message :log :requestid))
+  (or
+    (-> log :_source :message :hybris_request_id)
+    (-> log :_source :message :log :requestid)))
 
 (defn get-tenant [log]
   {:pre [log]}
