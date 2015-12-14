@@ -41,85 +41,85 @@
   (chsk-send! [@option @value] (* 60 1000) #(do
                                              (case %
                                                :chsk/timeout (js/alert "An timeout error occured")
-                                               :chsk/error (js/alert "A technical error")
+                                               :chsk/error (js/alert "A technical error occured")
                                                (let [[s payload] %]
                                                  (case s
                                                    :success (swap! results conj payload)
-                                                   (js/alert payload))))
-                                             (reset! status "")))
-  (reset! value ""))
+                                                   (js/alert (str "A technical error occured: " payload)))))
+                                               (reset! status "")))
+              (reset! value ""))
 
-(defn ui-search-option [option]
-  (let [sri :search/request-id svri :search/vcap-request-id]
+  (defn ui-search-option [option]
+    (let [sri :search/request-id svri :search/vcap-request-id]
+      [:div
+       [:label [:input {:type      "radio" :name "option" :value "request-id"
+                        :on-change #(reset! option sri)
+                        :checked   (= @option sri)}] "request-id"]
+       [:label [:input {:type      "radio" :name "option" :value "vcap-request-id"
+                        :on-change #(reset! option svri)
+                        :checked   (= @option svri)}] "vcap-request-id"]]))
+
+  (defn reset-search [value results]
+    (reset! value "")
+    (reset! results []))
+
+  (defn ui-search-reset-button [value results]
     [:div
-     [:label [:input {:type      "radio" :name "option" :value "request-id"
-                      :on-change #(reset! option sri)
-                      :checked   (= @option sri)}] "request-id"]
-     [:label [:input {:type      "radio" :name "option" :value "vcap-request-id"
-                      :on-change #(reset! option svri)
-                      :checked   (= @option svri)}] "vcap-request-id"]]))
+     [:input {:type     "button"
+              :value    "Reset"
+              :on-click #(reset-search value results)}]])
 
-(defn reset-search [value results]
-  (reset! value "")
-  (reset! results []))
-
-(defn ui-search-reset-button [value results]
-  [:div
-   [:input {:type     "button"
-            :value    "Reset"
-            :on-click #(reset-search value results)}]])
-
-(defn ui-search-button [option value status results]
-  [:div
-   [:input {:type     "button"
-            :value    "Search"
-            :on-click #(do (search option value status results)
-                           (reset! status "searching"))}]])
-
-(defn ui-search-status [status]
-  [:p @status])
-
-(defn ui-search [results]
-  (let [option (r/atom :search/request-id)
-        value (r/atom "")
-        status (r/atom "")]
+  (defn ui-search-button [option value status results]
     [:div
-     [ui-input value]
-     [ui-search-status status]
-     [ui-search-option option]
-     [ui-search-button option value status results]
-     [ui-search-reset-button value results]]))
+     [:input {:type     "button"
+              :value    "Search"
+              :on-click #(do (search option value status results)
+                             (reset! status "searching"))}]])
 
-(defn ui-app [i]
-  [:ul (for [j (:nested i)]
-         ^{:key (gensym)} [:li (let [s (:_source j) m (:message s) l (:log m)]
-                                 (str (:level m) ": " (:message l) (if-let [st (:stacktrace l)] st)))])])
+  (defn ui-search-status [status]
+    [:p @status])
 
-(defn ui-rtr [i]
-  ^{:key (gensym)} [:li (let [hop (:hop i) s (:_source i) m (:message s)]
-                          (str (clojure.string/join "" (repeat (if (number? hop)
-                                                                 hop
-                                                                 1) "-"))
-                               "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
-                    (ui-app i)])
+  (defn ui-search [results]
+    (let [option (r/atom :search/request-id)
+          value (r/atom "")
+          status (r/atom "")]
+      [:div
+       [ui-input value]
+       [ui-search-status status]
+       [ui-search-option option]
+       [ui-search-button option value status results]
+       [ui-search-reset-button value results]]))
 
-(defn ui-search-results [results]
-  [:div "Search results:"
-   [:div (for [r @results]
-           ^{:key (gensym)} [:ul (for [i r]
-                                   (ui-rtr i))])]])
+  (defn ui-app [i]
+    [:ul (for [j (:nested i)]
+           ^{:key (gensym)} [:li (let [s (:_source j) m (:message s) l (:log m)]
+                                   (str (:level m) ": " (:message l) (if-let [st (:stacktrace l)] st)))])])
 
-(defn app []
-  (let [search-results (r/atom [])]
-    [:div
-     [ui-header "YaaS Call Analyzer - alpha version"]
-     [ui-search search-results]
-     [ui-search-results search-results]]))
+  (defn ui-rtr [i]
+    ^{:key (gensym)} [:li (let [hop (:hop i) s (:_source i) m (:message s)]
+                            (str (clojure.string/join "" (repeat (if (number? hop)
+                                                                   hop
+                                                                   1) "-"))
+                                 "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
+                      (ui-app i)])
 
-(defn render-app []
-  (r/render-component [app] (js/document.getElementById "app")))
+  (defn ui-search-results [results]
+    [:div "Search results:"
+     [:div (for [r @results]
+             ^{:key (gensym)} [:ul (for [i r]
+                                     (ui-rtr i))])]])
 
-(defn ^:export run []
-  (render-app))
+  (defn app []
+    (let [search-results (r/atom [])]
+      [:div
+       [ui-header "YaaS Call Analyzer - alpha version"]
+       [ui-search search-results]
+       [ui-search-results search-results]]))
+
+  (defn render-app []
+    (r/render-component [app] (js/document.getElementById "app")))
+
+  (defn ^:export run []
+    (render-app))
 
 

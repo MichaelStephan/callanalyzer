@@ -49,16 +49,17 @@
 (defmethod event-msg-handler :default [{:keys [?reply-fn] :as ev-msg}]
   (warnf "Unhandled event: %s" ev-msg)
   (when ?reply-fn
-    (?reply-fn [:error "invalid argument"])))
+    (?reply-fn [:error "Invalid search type"])))
 
 (defn event-msg-handler* [{:keys [?reply-fn event] :as ev-msg}]
   (when ?reply-fn
     (?reply-fn
       (try+
         [:success (event-msg-handler (assoc ev-msg :event (second event)))]
+        (catch [:type :illegal-argument] _ [:error "Illegal argument"])
         (catch Object e (do
-                          (error "Search failed" e)
-                          [:error "unknown error"]))))))
+                          (error "Unexpected error" e)
+                          [:error "Unexpected error"]))))))
 
 (defroutes app-routes
            (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
