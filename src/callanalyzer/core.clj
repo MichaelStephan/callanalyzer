@@ -32,7 +32,7 @@
 
   (when-not @es-conn
     (throw+ (c/make-illegal-state-exception #'es-conn)))
-  (let [res (esd/search-all-types @es-conn "_all" :query query :size es-page-size :from 0 :timeout "5s")
+  (let [res (esd/search-all-types @es-conn "_all" :query query :size es-page-size :from 0)
         n (esrsp/total-hits res)
         hits (esrsp/hits-from res)]
     (info "Query " query " returned " n " results")
