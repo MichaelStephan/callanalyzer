@@ -63,4 +63,4 @@
 
 (defn get-timestamp [log]
   {:pre [log]}
-  (-> log :_source :timestamp))
+  (-> log :_source :message :timestamp))

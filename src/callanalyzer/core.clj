@@ -94,7 +94,7 @@
         res2 (search* {:field :vcap-request-ids :value ids})]
     (sort-by c/get-timestamp (distinct (concat res1 res2)))))
 
-(defmethod search-with-deps :vcap-request-id [{:keys [value] :as query}]
+(defmethod search-with-deps :vcap-request-id [query]
   (info "Searching with dependencies (vcap-request-id):" query)
   (let [res (search* query)
         rid (get-request-id res)]

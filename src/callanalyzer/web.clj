@@ -18,9 +18,9 @@
 (def es-endpoint "http://localhost:19200")
 (defonce server (atom nil))
 
-(defn get-port [] (try
+(defn get-port [] (try+
                     (read-string (:port env))
-                    (catch Exception e
+                    (catch Object _
                       (warn "No PORT environment variable set, using default")
                       8081)))
 
@@ -72,7 +72,7 @@
 
 (defn get-es-endpoint []
   (let [endpoint (or (:es-endpoint env) es-endpoint)]
-    (info "Using elastichsearch endpoint " endpoint)
+    (info "Using elasticsearch endpoint " endpoint)
     endpoint))
 
 (defn start-server! []
