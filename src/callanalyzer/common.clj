@@ -42,7 +42,9 @@
 
 (defn get-hop [log]
   {:pre [log]}
-  (-> log :_source :message :log :hop))
+  (or
+    (-> log :_source :message :hybris_hop)
+    (-> log :_source :message :log :hop)))
 
 (defn get-service [log]
   {:pre [log]}

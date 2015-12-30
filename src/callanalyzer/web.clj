@@ -19,11 +19,13 @@
 (def es-endpoint "http://localhost:19200")
 (defonce server_ (atom nil))
 
+(def passwords {"user" "secret"})
+
 (defn get-port [] (try+
-                    (read-string (:port env))
-                    (catch Object _
-                      (warn "No PORT environment variable set, using default")
-                      8081)))
+                   (read-string (:port env))
+                   (catch Object _
+                     (warn "No PORT environment variable set, using default")
+                     8081)))
 
 (let [{:keys [ch-recv send-fn ajax-post-fn ajax-get-or-ws-handshake-fn connected-uids]}
       (sente/make-channel-socket! sente-web-server-adapter)]
@@ -54,33 +56,35 @@
         uid (:uid session)]
     (when-let [reply-fn ?reply-fn]
       (reply-fn
-        (if uid
-          (try+
-            [:success (event-msg-handler (assoc ev-msg :event (second event)))]
-            (catch [:type :illegal-argument] _ [:error "Illegal argument"])
-            (catch Object e (do
-                              (error "Unexpected error" e)
-                              [:error "Unexpected error"])))
-          [:error "Access denied"])))))
+       (if uid
+         (try+
+          [:success (event-msg-handler (assoc ev-msg :event (second event)))]
+          (catch [:type :illegal-argument] _ [:error "Illegal argument"])
+          (catch Object e (do
+                            (error "Unexpected error" e)
+                            [:error "Unexpected error"])))
+         [:error "Access denied"])))))
+
+(defn check-password [user-id password]
+  (= (get passwords user-id) password))
 
 (defn login! [req]
   (let [{:keys [session params]} req
         {:keys [user-id password]} params]
-    (if (= password "secret")
+    (if (check-password user-id password)
       {:status 200 :session (assoc session :uid user-id)}
       {:status 403})))
 
-
 (defn logout! [req]
-  (let [{:keys [session params]} req]
+  (let [{:keys [session]} req]
     {:status 200 :session (dissoc session :uid)}))
 
 (defroutes app-routes
-           (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
-           (POST "/chsk" req (ring-ajax-post req))
-           (POST "/login" req (login! req))
-           (POST "/logout" req (logout! req))
-           (route/resources "/"))
+  (GET "/chsk" req (ring-ajax-get-or-ws-handshake req))
+  (POST "/chsk" req (ring-ajax-post req))
+  (POST "/login" req (login! req))
+  (POST "/logout" req (logout! req))
+  (route/resources "/"))
 
 (def ring-handler
   (-> app-routes

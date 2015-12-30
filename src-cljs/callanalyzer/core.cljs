@@ -7,6 +7,38 @@
 
 (enable-console-print!)
 
+(def sente-endpoint "/chsk")
+(def login-endpoint "/login")
+(def logout-endpoint "/logout")
+
+(def router_ (atom nil))
+
+(let [{:keys [chsk ch-recv send-fn state]}
+      (sente/make-channel-socket! sente-endpoint  {:type :ajax})]
+  (def chsk chsk)
+  (def ch-chsk ch-recv)
+  (def chsk-send! send-fn)
+  (def chsk-state state))
+
+(defmulti event-msg-handler :id)
+(defmethod event-msg-handler :chsk/handshake [_])
+(defmethod event-msg-handler :chsk/state [_])
+
+(defn event-msg-handler* [ev-msg] (event-msg-handler ev-msg))
+
+(defmethod event-msg-handler :default
+  [{:keys [event]}]
+  (errorf "Unhandled event: %s" event))
+
+(defn stop-router! [] (when-let [stop-fn @router_] (stop-fn)))
+
+(defn start-router! []
+  (stop-router!)
+  (reset! router_ (sente/start-chsk-router! ch-chsk event-msg-handler*)))
+
+(defn start! []
+  (start-router!))
+
 (defn ui-header [title]
   [:div>h1 title])
 
@@ -17,7 +49,7 @@
             :on-change #(reset! value (-> % .-target .-value))}]])
 
 (defn ^:export login [user-id password]
-  (sente/ajax-call "/login" {:method     :post
+  (sente/ajax-call login-endpoint {:method :post
                              :params     {:user-id  user-id
                                           :password password}
                              :timeout-ms 5000}
@@ -35,8 +67,8 @@
                          (js/alert e))))))
 
 (defn ^:export logout []
-  (sente/ajax-call "/logout" {:method     :post
-                              :timeout-ms 5000}
+  (sente/ajax-call logout-endpoint {:method :post
+                                    :timeout-ms 5000}
                    (fn [_])))
 
 (defn ^:export search [option value status results]
@@ -99,10 +131,7 @@
 
 (defn ui-rtr [i]
   ^{:key (gensym)} [:li (let [hop (:hop i) s (:_source i) m (:message s)]
-                          (str (clojure.string/join "" (repeat (if (number? hop)
-                                                                 hop
-                                                                 1) "-"))
-                               "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
+                          (str hop "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
                     (ui-app i)])
 
 (defn ui-search-results [results]
@@ -121,37 +150,8 @@
 (defn render-app []
   (r/render-component [app] (js/document.getElementById "app")))
 
-(defn ^:export run []
+(defn ^:export run [& args]
+  (start!)
   (render-app))
 
-
-(def router_ (atom nil))
-
-(let [{:keys [chsk ch-recv send-fn state]}
-      (sente/make-channel-socket! "/chsk" {:type :ajax})]
-  (def chsk chsk)
-  (def ch-chsk ch-recv)
-  (def chsk-send! send-fn)
-  (def chsk-state state))
-
-(defmulti event-msg-handler :id)
-(defmethod event-msg-handler :chsk/handshake [_])
-(defmethod event-msg-handler :chsk/state [_])
-
-(defn event-msg-handler* [ev-msg] (event-msg-handler ev-msg))
-
-(defmethod event-msg-handler :default
-  [{:keys [event]}]
-  (errorf "Unhandled event: %s" event))
-
-(defn stop-router! [] (when-let [stop-fn @router_] (stop-fn)))
-
-(defn start-router! []
-  (stop-router!)
-  (reset! router_ (sente/start-chsk-router! ch-chsk event-msg-handler*)))
-
-(defn start! []
-  (start-router!))
-
-(start!)
 

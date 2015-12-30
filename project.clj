@@ -15,10 +15,17 @@
                  [org.clojure/clojurescript "1.7.122"]
                  [reagent "0.5.1" :exclusions [cljsjs/react]]
                  [cljsjs/react-with-addons "0.13.3-0"]]
-  :plugins [[lein-cljsbuild "1.1.0"]]
+  :plugins [[lein-cljsbuild "1.1.0"]
+            [lein-figwheel "0.5.0-2"]]
   :global-vars {*assert* true}
-  :cljsbuild {
-              :builds [{:source-paths ["src-cljs"]
-                        :compiler     {:output-to     "resources/public/js/main.js"
-                                       :optimizations :whitespace
-                                       :pretty-print  true}}]})
+  :cljsbuild {:builds [{:id "dev"
+                        :source-paths ["src-cljs"]
+                        :figwheel true 
+                        :compiler     {:main "callanalyzer.core" 
+                                       :asset-path "js/out"
+                                       :output-to "resources/public/js/main.js"
+                                       :output-dir "resources/public/js/out"
+                                       :optimizations :none
+                                       :source-map-timestamp true
+                                       :pretty-print  true}}]}
+  :figwheel {})
