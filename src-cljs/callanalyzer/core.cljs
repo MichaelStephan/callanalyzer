@@ -11,14 +11,14 @@
 (def login-endpoint "/login")
 (def logout-endpoint "/logout")
 
-(def router_ (atom nil))
+(defonce router_ (atom nil))
 
 (let [{:keys [chsk ch-recv send-fn state]}
       (sente/make-channel-socket! sente-endpoint  {:type :ajax})]
-  (def chsk chsk)
-  (def ch-chsk ch-recv)
-  (def chsk-send! send-fn)
-  (def chsk-state state))
+  (defonce chsk chsk)
+  (defonce ch-chsk ch-recv)
+  (defonce chsk-send! send-fn)
+  (defonce chsk-state state))
 
 (defmulti event-msg-handler :id)
 (defmethod event-msg-handler :chsk/handshake [_])
@@ -64,12 +64,14 @@
                          (= ?status 403) (throw "Login denied, invalid credentials")
                          :else (throw "Loging failed, an unknown error occured"))
                        (catch :default e
-                         (js/alert e))))))
+                         (js/alert e)))))
+  nil)
 
 (defn ^:export logout []
   (sente/ajax-call logout-endpoint {:method :post
                                     :timeout-ms 5000}
-                   (fn [_])))
+                   (fn [_]))
+  nil)
 
 (defn ^:export search [option value status results]
   (chsk-send! [@option @value] (* 60 1000) #(do
@@ -140,15 +142,20 @@
            ^{:key (gensym)} [:ul (for [i r]
                                    (ui-rtr i))])]])
 
+(defonce search-results (r/atom []))
+
 (defn app []
-  (let [search-results (r/atom [])]
-    [:div
-     [ui-header "YaaS Call Analyzer - alpha version"]
-     [ui-search search-results]
-     [ui-search-results search-results]]))
+  [:div
+   [ui-header "YaaS Call Analyzer - alpha version"]
+   [ui-search search-results]
+   [ui-search-results search-results]])
 
 (defn render-app []
   (r/render-component [app] (js/document.getElementById "app")))
+
+(defn fig-reload []
+  (infof "reloading code")
+  (r/force-update-all))
 
 (defn ^:export run [& args]
   (start!)

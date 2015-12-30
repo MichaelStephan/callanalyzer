@@ -16,16 +16,24 @@
                  [reagent "0.5.1" :exclusions [cljsjs/react]]
                  [cljsjs/react-with-addons "0.13.3-0"]]
   :plugins [[lein-cljsbuild "1.1.0"]
-            [lein-figwheel "0.5.0-2"]]
+            [lein-figwheel "0.5.0-2"]
+            ]
   :global-vars {*assert* true}
+  :clean-targets ^{:protect false} ["resources/public/js"]
   :cljsbuild {:builds [{:id "dev"
                         :source-paths ["src-cljs"]
-                        :figwheel true 
+                        :figwheel {:on-jsload "callanalyzer.core/fig-reload"} 
                         :compiler     {:main "callanalyzer.core" 
                                        :asset-path "js/out"
                                        :output-to "resources/public/js/main.js"
                                        :output-dir "resources/public/js/out"
                                        :optimizations :none
                                        :source-map-timestamp true
+                                       :pretty-print  true}}
+                       {:id "dev-no-figwheel"
+                        :source-paths ["src-cljs"]
+                        :compiler     {:output-to     "resources/public/js/main.js"
+                                       :optimizations :whitespace
                                        :pretty-print  true}}]}
-  :figwheel {})
+  ;:figwheel {}
+  )
