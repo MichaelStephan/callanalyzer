@@ -3,7 +3,8 @@
     [taoensso.sente :as sente :refer (cb-success?)]
     [taoensso.timbre :as timbre :refer-macros (tracef debugf infof warnf errorf)]
     [reagent.core :as r]
-    [cljs.reader :as reader]))
+    [cljs.reader :as reader]
+    [clojure.string :as cstr]))
 
 (enable-console-print!)
 
@@ -133,7 +134,10 @@
 
 (defn ui-rtr [i]
   ^{:key (gensym)} [:li (let [hop (:hop i) s (:_source i) m (:message s)]
-                          (str hop "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
+                          (str (:timestamp s) " " (cstr/join (repeatedly (if (number? hop)
+                                                                           hop
+                                                                           0)
+                                                                         (fn [] "-") )) "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
                     (ui-app i)])
 
 (defn ui-search-results [results]

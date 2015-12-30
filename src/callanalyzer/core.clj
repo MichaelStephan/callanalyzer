@@ -92,7 +92,7 @@
   (let [res1 (search* query)
         ids (get-vcap-request-ids res1)
         res2 (search* {:field :vcap-request-ids :value ids})]
-    (sort-by c/get-timestamp (distinct (concat res1 res2)))))
+    (distinct (concat res1 res2))))
 
 (defmethod search-with-deps :vcap-request-id [query]
   (info "Searching with dependencies (vcap-request-id):" query)
@@ -103,18 +103,19 @@
 (defmethod search-with-deps :default [{:keys [field]}]
   (warn "Searching for" field "not supported"))
 
-(defn nest-search-with-deps [res]
+(defn nest-search-with-deps [res] 
   (let [apps (filter c/app? res)
         rtrs (filter c/rtr? res)]
-    (map #(let [nested (filter (partial c/equal-vcap-request-id? (c/get-vcap-request-id %)) apps)]
-            (-> %
-                (assoc :nested nested)
-                (assoc :request-id (some c/get-request-id (conj nested %)))
-                (assoc :tenant (some c/get-tenant nested))
-                (assoc :hop (some c/get-hop nested))
-                (assoc :service (some c/get-service nested))
-                (assoc :client (some c/get-client nested))))
-         rtrs)))
+    (->> rtrs
+         (map #(let [nested (filter (partial c/equal-vcap-request-id? (c/get-vcap-request-id %)) apps)]
+                 (-> %
+                     (assoc :nested (sort-by c/get-timestamp nested))
+                     (assoc :request-id (some c/get-request-id (conj nested %)))
+                     (assoc :tenant (some c/get-tenant nested))
+                     (assoc :hop (some c/get-hop nested))
+                     (assoc :service (some c/get-service nested))
+                     (assoc :client (some c/get-client nested)))))
+         (sort-by #(- (c/get-timestamp %) (* 1000 (c/get-response-time %))))))); TODO
 
 (defn search-with-deps* [query]
   (info "Searching with dependencies:" query)

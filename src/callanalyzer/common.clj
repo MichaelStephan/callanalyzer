@@ -63,6 +63,11 @@
 (defn equal-vcap-request-id? [vcap-request-id log]
   (= vcap-request-id (get-vcap-request-id log)))
 
+(defn get-response-time [log]
+  {:pre [log]}
+  (-> log :_source :message :response_time))
+
 (defn get-timestamp [log]
   {:pre [log]}
-  (-> log :_source :message :timestamp))
+  (or (-> log :_source :message :timestamp)
+      (-> log :_source :timestamp)))

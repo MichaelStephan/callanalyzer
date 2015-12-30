@@ -60,7 +60,9 @@
           (try+
             [:success (event-msg-handler (assoc ev-msg :event (second event)))]
             (catch [:type :illegal-argument] _ [:error "Illegal argument"])
-            (catch Object e [:error "Unexpected error"]))
+            (catch Object e (do 
+                              (error "Unxpected error" e)
+                              [:error "Unexpected error"])))
           [:error "Access denied"])))))
 
 (defn check-password [user-id password]
