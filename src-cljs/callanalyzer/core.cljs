@@ -15,10 +15,10 @@
 
 (let [{:keys [chsk ch-recv send-fn state]}
       (sente/make-channel-socket! sente-endpoint  {:type :ajax})]
-  (defonce chsk chsk)
-  (defonce ch-chsk ch-recv)
-  (defonce chsk-send! send-fn)
-  (defonce chsk-state state))
+  (def chsk chsk)
+  (def ch-chsk ch-recv)
+  (def chsk-send! send-fn)
+  (def chsk-state state))
 
 (defmulti event-msg-handler :id)
 (defmethod event-msg-handler :chsk/handshake [_])

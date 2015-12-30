@@ -52,7 +52,6 @@
     (reply-fn [:error "Invalid search type"])))
 
 (defn event-msg-handler* [{:keys [?reply-fn event ring-req] :as ev-msg}]
-  (info "lala")
   (let [session (:session ring-req)
         uid (:uid session)]
     (when-let [reply-fn ?reply-fn]
