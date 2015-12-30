@@ -75,7 +75,7 @@
 
 (defn ^:export search [option value status results]
   (chsk-send! [@option @value] (* 60 1000) #(do
-                                             (case %
+                                              (case %
                                                :chsk/timeout (js/alert "An timeout error occured")
                                                :chsk/error (js/alert "A technical error occured")
                                                (let [[s payload] %]
