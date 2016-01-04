@@ -91,8 +91,9 @@
   (info "Searching with dependencies (request-id):" query)
   (let [res1 (search* query)
         ids (get-vcap-request-ids res1)
-        res2 (search* {:field :vcap-request-ids :value ids})]
-    (distinct (concat res1 res2))))
+        ; res2 (search* {:field :vcap-request-ids :value ids})
+        ]
+    (distinct (concat res1 )))) ; res2 
 
 (defmethod search-with-deps :vcap-request-id [query]
   (info "Searching with dependencies (vcap-request-id):" query)

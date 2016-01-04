@@ -166,40 +166,67 @@
                     (ui-app i)])
 
 (defn ui-search-results []
-  (let [results (subscribe [:search-result])]
-  [:div "Search results:"
-   [:div ^{:key (gensym)} [:ul (for [i @results]
-                                 (ui-rtr i))]]]))
+  (fn []
+    (let [results (subscribe [:search-result])]
+    [:div "Search results:"
+     [:div ^{:key (gensym)} [:ul (for [i @results]
+                                   (ui-rtr i))]]])))
+
+(def bar-height 20)
+
+(defn d3-render [data]
+  (let [d3data (clj->js data)
+                                    min (apply min (map #(get-in % [:_source :message :timestamp]) data))
+                                    max (apply max (map #(+ (get-in % [:_source :message :timestamp])
+                                                            (* 10000000 (get-in % [:_source :message :response_time]))) data))
+                                    nmin (- max min)
+                                    x (.. (js/d3.scale.linear)
+                                          (range (clj->js [0 400]))
+                                          (domain (clj->js [0 nmin])))
+                                    bar (.. js/d3
+                                            (select "svg")
+                                            (selectAll "g")
+                                            (data d3data)
+                                            enter
+                                            (append "g")
+                                            (attr "transform" (fn [d, i] (str "translate(0," (* i bar-height) ")"))))]
+                                (.. bar
+                                    (append "rect")
+                                    (attr "x" (fn [d] (x (- (get-in (js->clj d) ["_source" "message" "timestamp"]) min))))
+                                    (attr "width" (fn [d] (x (* 10000000 (get-in (js->clj d) ["_source" "message" "response_time"])))))
+                                    (attr "height" (fn [d] bar-height)))
+                                ))
+
+(defn d3-inner [data]
+   (reagent/create-class
+      {:reagent-render (fn [] [:div [:svg {:width 400 :height 400}]])
+
+       :component-did-mount (fn [] (d3-render data))
+
+       :component-did-update (fn [this]
+                               (let [[_ data] (reagent/argv this)
+                                     d3data (clj->js data)]
+                                 (d3-render data)))}))
 
 (defn app []
-  [:div
-   [ui-header]
-   [ui-search]
-   [ui-search-results]])
-
+  (let [data (subscribe [:search-result])]
+    (fn []
+      [:div {:class "container"}
+        [:div {:class "row"}
+          [:div {:class "col-md-5"}
+           [ui-header]
+           [ui-search]
+           [ui-search-results]]]
+       [:div {:class "row"}
+        [:div {:class "col-md-5"}
+         [d3-inner @data]
+         ]]])))
+  
 (def app-state {:search {:term ""
                          :option :search/request-id 
                          :status :idle
-                         :result []}
-                ;:circles [{:name "circle 1"
-                     ; :x 10
-                     ; :y 10
-                     ; :r 10
-                     ; :color "black"}
-                     ;{:name "circle 2"
-                     ; :x 35
-                     ; :y 35
-                     ; :r 15
-                     ; :color "red"}
-                     ;{:name "circle 3"
-                      ;:x 100
-                      ;:y 100
-                      ;:r 30
-                      ;:color "blue"}]
-                })
+                         :result []}})
 
-;; define your app data so that it doesn't get over-written on reload
-;;---- Event handlers-----------
 (register-handler
   :initialize-db
   (fn [_ _]
@@ -231,98 +258,21 @@
   (fn [db _]
     app-state))
 
-;(register-handler
-;  :update
-;  (fn
-;    [db [_ idx param val]]
-;    (println "idx " idx "param " param "val " val)
-;    (assoc-in db [:circles idx param ] val)))
-
-;;---- Subscription handlers-----------
-(register-sub
-  :search-option
+(register-sub :search-option
   (fn [db _]
     (reaction (get-in @db [:search :option]))))
 
-(register-sub
-  :search-status
+(register-sub :search-status
   (fn [db _]
     (reaction (get-in @db [:search :status]))))
 
-(register-sub
-  :search-term
+(register-sub :search-term
   (fn [db _]
     (reaction (get-in @db [:search :term]))))
 
-
-(register-sub
-  :search-result
+(register-sub :search-result
   (fn [db _]
     (reaction (get-in @db [:search :result]))))
-
-;(register-sub
-;  :circles
-;  (fn
-;    [db _]
-;    (reaction (:circles @db))))
-
-;(defn d3-inner [data]
-; (reagent/create-class
-;    {:reagent-render (fn [] [:div [:svg {:width 400 :height 800}]])
-;
-;     :component-did-mount (fn []
-;                             (println "called 1x")
-;                            (let [d3data (clj->js data)]
-;                              (.. js/d3
-;                                  (select "svg")
-;                                  (selectAll "circle")
-;                                  (data d3data)
-;                                  enter
-;                                  (append "circle")
-;                                  (attr "cx" (fn [d] (.-x d)))
-;                                  (attr "cy" (fn [d] (.-y d)))
-;                                  (attr "r" (fn [d] (.-r d)))
-;                                  (attr "fill" (fn [d] (.-color d))))))
-;
-;     :component-did-update (fn [this]
-;                             (println "called 2")
-;                             (let [[_ data] (reagent/argv this)
-;                                   d3data (clj->js data)]
-;                               (.. js/d3
-;                                   (selectAll "circle")
-;                                   (data d3data)
-;                                   (attr "cx" (fn [d] (.-x d)))
-;                                   (attr "cy" (fn [d] (.-y d)))
-;                                   (attr "r" (fn [d] (.-r d))))))}))
-
-
-;(defn slider [param idx value]
-;  [:input {:type "range"
-;           :value value
-;           :min 0
-;           :max 500
-;           :style {:width "100%"}
-;           :on-change #(dispatch [:update idx param (-> % .-target .-value)])}])
-
-;(defn sliders [data]
-;    [:div (for [[idx d] (map-indexed vector data)]
-;            ^{:key (str "slider-" idx)}
-;            [:div
-;             [:h3 (:name d)]
-;             "x " (:x d) (slider :x idx (:x d))
-;             "y " (:y d) (slider :y idx (:y d))
-;             "r " (:r d) (slider :r idx (:r d))])])
-
-;(defn app2 []
-;  (let [data (subscribe [:circles])]
-;    (fn []
-;      [:div {:class "container"}
-;        [:div {:class "row"}
-;          [:div {:class "col-md-5"}
-;            [d3-inner @data]]
-;          [:div {:class "col-md-5"}
-;            [sliders @data]]]]
-;      )))
 
 (defn render-app []
   (r/render-component [app] (js/document.getElementById "app")))
