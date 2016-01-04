@@ -14,10 +14,11 @@
                  [com.taoensso/sente "1.7.0"]
                  [org.clojure/clojurescript "1.7.122"]
                  [reagent "0.5.1" :exclusions [cljsjs/react]]
-                 [cljsjs/react-with-addons "0.13.3-0"]]
+                 [cljsjs/react-with-addons "0.13.3-0"]
+                 [re-frame "0.6.0"]
+                 [cljsjs/d3 "3.5.7-1"]]
   :plugins [[lein-cljsbuild "1.1.0"]
-            [lein-figwheel "0.5.0-2"]
-            ]
+            [lein-figwheel "0.5.0-2"]]
   :global-vars {*assert* true}
   :clean-targets ^{:protect false} ["resources/public/js"]
   :cljsbuild {:builds [{:id "dev"
