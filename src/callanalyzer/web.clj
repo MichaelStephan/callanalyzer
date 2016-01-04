@@ -56,14 +56,14 @@
         uid (:uid session)]
     (when-let [reply-fn ?reply-fn]
       (reply-fn
-        (if uid
-          (try+
-            [:success (event-msg-handler (assoc ev-msg :event (second event)))]
-            (catch [:type :illegal-argument] _ [:error "Illegal argument"])
-            (catch Object e (do 
-                              (error "Unxpected error" e)
-                              [:error "Unexpected error"])))
-          [:error "Access denied"])))))
+       (if uid
+         (try+
+          [:success (event-msg-handler (assoc ev-msg :event (second event)))]
+          (catch [:type :illegal-argument] _ [:error "Illegal argument"])
+          (catch Object e (do 
+                            (error "Unxpected error" e)
+                            [:error "Unexpected error"])))
+         [:error "Access denied"])))))
 
 (defn check-password [user-id password]
   (= (get passwords user-id) password))

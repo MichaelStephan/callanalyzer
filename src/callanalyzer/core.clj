@@ -114,8 +114,12 @@
                      (assoc :tenant (some c/get-tenant nested))
                      (assoc :hop (some c/get-hop nested))
                      (assoc :service (some c/get-service nested))
+                     (assoc :timestamp (c/get-timestamp %))
                      (assoc :client (some c/get-client nested)))))
-         (sort-by #(- (c/get-timestamp %) (* 1000 (c/get-response-time %))))))); TODO does the timestamp show the start or the end of the request?
+         (sort-by identity (fn [x y]
+                             (some #(when (not= 0 %)
+                                      %)
+                                   (map #(compare (% x) (% y)) [c/get-timestamp c/get-hop c/get-response-time c/get-es-timestamp])))))))
 
 (defn search-with-deps* [query]
   (info "Searching with dependencies:" query)

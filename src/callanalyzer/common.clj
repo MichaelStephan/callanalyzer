@@ -67,7 +67,10 @@
   {:pre [log]}
   (-> log :_source :message :response_time))
 
+(defn get-es-timestamp [log]
+  {:pre [log]}
+  (-> log :_source :timestamp))
+
 (defn get-timestamp [log]
   {:pre [log]}
-  (or (-> log :_source :message :timestamp)
-      (-> log :_source :timestamp)))
+  (-> log :_source :message :timestamp))
