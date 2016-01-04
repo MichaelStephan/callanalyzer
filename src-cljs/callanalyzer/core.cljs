@@ -177,10 +177,10 @@
    [ui-search]
    [ui-search-results]])
 
-(def app-state {:search-term ""
-                :search-option :search/request-id 
-                :search-status :idle
-                :search-result []
+(def app-state {:search {:term ""
+                         :option :search/request-id 
+                         :status :idle
+                         :result []}
                 ;:circles [{:name "circle 1"
                      ; :x 10
                      ; :y 10
@@ -207,25 +207,25 @@
 
 (register-handler :search
   (fn [db _]
-    (let [{:keys [search-option search-term]} db]
-      (search search-option search-term))
+    (let [{:keys [option term]} (:search db)]
+      (search option term))
     db))
 
 (register-handler :search-status
   (fn [db [_ status]]
-    (assoc-in db [:search-status] status)))
+    (assoc-in db [:search :status] status)))
 
 (register-handler :search-term
   (fn [db [_ term]]
-    (assoc-in db [:search-term] term)))
+    (assoc-in db [:search :term] term)))
 
 (register-handler :search-option
   (fn [db [_ option]]
-    (assoc-in db [:search-option] option)))
+    (assoc-in db [:search :option] option)))
 
 (register-handler :search-result
   (fn [db [_ result]]
-    (assoc-in db [:search-result] result)))
+    (assoc-in db [:search :result] result)))
 
 (register-handler :reset
   (fn [db _]
@@ -242,23 +242,23 @@
 (register-sub
   :search-option
   (fn [db _]
-    (reaction (:search-option @db))))
+    (reaction (get-in @db [:search :option]))))
 
 (register-sub
   :search-status
   (fn [db _]
-    (reaction (:search-status @db))))
+    (reaction (get-in @db [:search :status]))))
 
 (register-sub
   :search-term
   (fn [db _]
-    (reaction (:search-term @db))))
+    (reaction (get-in @db [:search :term]))))
 
 
 (register-sub
   :search-result
   (fn [db _]
-    (reaction (:search-result @db))))
+    (reaction (get-in @db [:search :result]))))
 
 ;(register-sub
 ;  :circles
