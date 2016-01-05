@@ -168,57 +168,78 @@
 (defn ui-search-results []
   (fn []
     (let [results (subscribe [:search-result])]
-    [:div "Search results:"
-     [:div ^{:key (gensym)} [:ul (for [i @results]
-                                   (ui-rtr i))]]])))
+      [:div "Search results:"
+       [:div ^{:key (gensym)} [:ul (for [i @results]
+                                     (ui-rtr i))]]])))
 
-(def bar-height 20)
+(defn sec->psec [sec]
+  (* 1000000000 sec))
 
-(defn d3-render [data]
+(defn d3-render [width height data]
   (let [d3data (clj->js data)
-                                    min (apply min (map #(get-in % [:_source :message :timestamp]) data))
-                                    max (apply max (map #(+ (get-in % [:_source :message :timestamp])
-                                                            (* 10000000 (get-in % [:_source :message :response_time]))) data))
-                                    nmin (- max min)
-                                    x (.. (js/d3.scale.linear)
-                                          (range (clj->js [0 400]))
-                                          (domain (clj->js [0 nmin])))
-                                    bar (.. js/d3
-                                            (select "svg")
-                                            (selectAll "g")
-                                            (data d3data)
-                                            enter
-                                            (append "g")
-                                            (attr "transform" (fn [d, i] (str "translate(0," (* i bar-height) ")"))))]
-                                (.. bar
-                                    (append "rect")
-                                    (attr "x" (fn [d] (x (- (get-in (js->clj d) ["_source" "message" "timestamp"]) min))))
-                                    (attr "width" (fn [d] (x (* 10000000 (get-in (js->clj d) ["_source" "message" "response_time"])))))
-                                    (attr "height" (fn [d] bar-height)))
-                                ))
+        max-bar-height 20
+        bar-margin 1 
+        bar-height (let [c (count data)]
+                         (if (< c 38)
+                           max-bar-height
+                           (js/Math.ceil(/ (- height (* c bar-margin)) c))))
+        timestamps (map #(get-in % [:_source :message :timestamp]) data)
+        min (apply min timestamps)
+        max (+ (apply max timestamps)
+               (sec->psec (apply max (map #(get-in % [:_source :message :response_time]) data))))
+        x (.. (js/d3.scale.linear)
+              (range #js [0 width])
+              (domain #js [0 (- max min)]))
+        selection (.. js/d3
+                      (select "svg")
+                      (selectAll "g")
+                      (data d3data))
+        bar (.. selection 
+                enter
+                (append "g")
+                (attr "transform" (fn [d, i] (str "translate(0," (* i (+ bar-height bar-margin)) ")"))))]
+    (println min max)
+    (.. bar
+        (append "rect")
+        (attr "fill" (fn [d] (let [response (get-in (js->clj d) ["_source" "message" "response"])]
+                               (cond
+                                 (< response 300) "green"
+                                 (and (>= response 300) (< response 400)) "green"
+                                 (and (>= response 400) (< response 500)) "orange"
+                                 (>= response 500) "red")))) 
+        (attr "x" (fn [d] (x (- (get-in (js->clj d) ["_source" "message" "timestamp"]) min))))
+        (attr "width" (fn [d] (let [x (x (sec->psec (get-in (js->clj d) ["_source" "message" "response_time"])))]
+                                (if (> x 1) x 5))))
+        (attr "height" (fn [d] bar-height)))
+      (.. selection exit remove)))
 
 (defn d3-inner [data]
+  (let [width 2000
+        height 2000]
    (reagent/create-class
-      {:reagent-render (fn [] [:div [:svg {:width 400 :height 400}]])
+      {:reagent-render (fn [] [:div [:svg {:width width :height height}]])
 
-       :component-did-mount (fn [] (d3-render data))
+       :component-did-mount (fn []
+                              (println 1)
+                              (d3-render width height data))
 
        :component-did-update (fn [this]
+                               (println 2)
                                (let [[_ data] (reagent/argv this)
                                      d3data (clj->js data)]
-                                 (d3-render data)))}))
+                                 (d3-render width height data)))})))
 
 (defn app []
   (let [data (subscribe [:search-result])]
     (fn []
-      [:div {:class "container"}
-        [:div {:class "row"}
-          [:div {:class "col-md-5"}
+      [:div
+        [:div
+          [:div
            [ui-header]
            [ui-search]
            [ui-search-results]]]
-       [:div {:class "row"}
-        [:div {:class "col-md-5"}
+       [:div
+        [:div
          [d3-inner @data]
          ]]])))
   
