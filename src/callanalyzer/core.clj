@@ -10,7 +10,7 @@
         [clojure.inspector :only [inspect-tree]]))
 
 (def es-page-size 1000)
-(def es-conn (atom nil))
+(defonce es-conn (atom nil))
 (def no-requestid-exception {:type :no-request-id :message "request-id not found"})
 (def multiple-request-ids-exception {:type :multiple-request-ids :message "multiple request-ids found"})
 
@@ -91,9 +91,8 @@
   (info "Searching with dependencies (request-id):" query)
   (let [res1 (search* query)
         ids (get-vcap-request-ids res1)
-        ; res2 (search* {:field :vcap-request-ids :value ids}) ; TODO in case of too many results lets skip this step
-        ]
-    (distinct (concat res1 )))) ; res2 
+        res2 (search* {:field :vcap-request-ids :value ids})]
+    (distinct (concat res1 res2))))
 
 (defmethod search-with-deps :vcap-request-id [query]
   (info "Searching with dependencies (vcap-request-id):" query)
@@ -104,23 +103,29 @@
 (defmethod search-with-deps :default [{:keys [field]}]
   (warn "Searching for" field "not supported"))
 
+(defn log-compare [x y]
+  (or (some #(when (not= 0 %) %)
+            (map #(compare (% x) (% y)) [:timestamp
+                                         :hop 
+                                         c/get-response-time
+                                         c/get-es-timestamp]))
+      0))
+
 (defn nest-search-with-deps [res] 
   (let [apps (filter c/app? res)
         rtrs (filter c/rtr? res)]
     (->> rtrs
-         (map #(let [nested (filter (partial c/equal-vcap-request-id? (c/get-vcap-request-id %)) apps)]
+         (map #(let [nested (filter (partial c/equal-vcap-request-id? (c/get-vcap-request-id %)) apps)
+                     all (concat [%] nested)]
                  (-> %
                      (assoc :nested (sort-by c/get-timestamp nested))
-                     (assoc :request-id (some c/get-request-id (conj nested %)))
-                     (assoc :tenant (some c/get-tenant nested))
-                     (assoc :hop (some c/get-hop nested))
-                     (assoc :service (some c/get-service nested))
+                     (assoc :request-id (some c/get-request-id all))
+                     (assoc :tenant (some c/get-tenant all))
+                     (assoc :hop (or (some c/get-hop all) 0))
+                     (assoc :service (some c/get-service all))
                      (assoc :timestamp (c/get-timestamp %))
-                     (assoc :client (some c/get-client nested)))))
-         (sort-by identity (fn [x y]
-                             (some #(when (not= 0 %)
-                                      %)
-                                   (map #(compare (% x) (% y)) [c/get-timestamp c/get-hop c/get-response-time c/get-es-timestamp])))))))
+                     (assoc :client (some c/get-client all)))))
+         (sort-by identity log-compare))))
 
 (defn search-with-deps* [query]
   (info "Searching with dependencies:" query)

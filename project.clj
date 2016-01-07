@@ -36,5 +36,5 @@
                         :compiler     {:output-to     "resources/public/js/main.js"
                                        :optimizations :whitespace
                                        :pretty-print  true}}]}
-  ;:figwheel {}
-  )
+  :figwheel {
+             :css-dirs ["resources/public/css"]})

@@ -162,7 +162,7 @@
                                                                            hop
                                                                            0)
                                                                          (fn [] "-") ))
-                               "> " (:client i) " calls " (:service i) (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
+                               "> " (:client i) " call " (:service i) "|" (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
                     (ui-app i)])
 
 (defn ui-search-results []
@@ -175,59 +175,105 @@
 (defn sec->psec [sec]
   (* 1000000000 sec))
 
-(defn d3-render [width height data]
+(defn psec->sec [psec]
+  (/ psec 1000000000))
+
+(defn response->color [response]
+  (cond
+    (< response 300) "green"
+    (and (>= response 300) (< response 400)) "green"
+    (and (>= response 400) (< response 500)) "orange"
+    (>= response 500) "red"
+    :else "black"))
+
+(defn d3-render [data new]
   (let [d3data (clj->js data)
+        c (count data)
         max-bar-height 20
-        bar-margin 1 
-        bar-height (let [c (count data)]
-                         (if (< c 38)
-                           max-bar-height
-                           (js/Math.ceil(/ (- height (* c bar-margin)) c))))
-        timestamps (map #(get-in % [:_source :message :timestamp]) data)
-        min (apply min timestamps)
-        max (+ (apply max timestamps)
-               (sec->psec (apply max (map #(get-in % [:_source :message :response_time]) data))))
+        min-bar-height 2
+        bar-margin 1
+        width 1024
+        bar-height (if (< c 50)
+                     max-bar-height
+                     min-bar-height)
+        height (if (= c 0)
+                 200
+                 (* c (+ bar-height bar-margin)))
+
+        min (apply min (map #(get-in % [:_source :message :timestamp]) data))
+        max (apply max (map #(+ (get-in % [:_source :message :timestamp])
+                                (sec->psec (get-in % [:_source :message :response_time]))) data))
         x (.. (js/d3.scale.linear)
-              (range #js [0 width])
-              (domain #js [0 (- max min)]))
-        selection (.. js/d3
-                      (select "svg")
-                      (selectAll "g")
-                      (data d3data))
-        bar (.. selection 
-                enter
-                (append "g")
-                (attr "transform" (fn [d, i] (str "translate(0," (* i (+ bar-height bar-margin)) ")"))))]
-    (println min max)
-    (.. bar
-        (append "rect")
-        (attr "fill" (fn [d] (let [response (get-in (js->clj d) ["_source" "message" "response"])]
-                               (cond
-                                 (< response 300) "green"
-                                 (and (>= response 300) (< response 400)) "green"
-                                 (and (>= response 400) (< response 500)) "orange"
-                                 (>= response 500) "red")))) 
-        (attr "x" (fn [d] (x (- (get-in (js->clj d) ["_source" "message" "timestamp"]) min))))
-        (attr "width" (fn [d] (let [x (x (sec->psec (get-in (js->clj d) ["_source" "message" "response_time"])))]
-                                (if (> x 1) x 5))))
-        (attr "height" (fn [d] bar-height)))
-      (.. selection exit remove)))
+              (range #js [0 (- width 200)]) ; TODO
+              (domain #js [0 (psec->sec (- max min))]))
+        xaxis (.. (js/d3.svg.axis)
+                (scale x)
+                (orient "bottom")
+                (tickPadding 10)
+                (innerTickSize (- height))
+                (outerTickSize 0))
+        svg (.. js/d3
+                (select "svg"))]
+    (when new
+      (.. svg
+          (append "g")
+          (attr "class" "data")))
+
+    (let [data-selection  (.. svg
+                              (selectAll ".data")
+                              (selectAll "g")
+                              (data d3data, (fn [d]
+                                              (get (js->clj d) "_id"))))]
+      (.. data-selection
+         exit
+         remove)
+
+      (.. data-selection 
+          enter
+          (append "g")
+          (attr "transform"
+                (fn [d, i]
+                  (str "translate(0," (* i (+ bar-height bar-margin)) ")")))
+          (append "rect")
+          (attr "fill"
+                (fn [d]
+                  (let [response (get-in (js->clj d) ["_source" "message" "response"])]
+                    (response->color response))))
+          (attr "x"
+                (fn [d]
+                  (let [timestamp (get-in (js->clj d) ["_source" "message" "timestamp"])]
+                    (x (psec->sec (- timestamp min))))))
+          (attr "width"
+                (fn [d]
+                  (let [response-time (get-in (js->clj d) ["_source" "message" "response_time"])
+                        width (x response-time)]
+                    (if (> width 1)
+                      width
+                      5))))
+          (attr "height"
+                (fn [d]
+                  bar-height)))
+      (.. svg
+          (selectAll ".axis")
+          remove)
+      (.. svg
+          (append "g")
+          (attr "class" "x axis")
+          (attr "transform" (str "translate(0," height ")"))
+          (call xaxis)))))
 
 (defn d3-inner [data]
-  (let [width 2000
-        height 2000]
+  (let [width 1024 
+        height 600]
    (reagent/create-class
       {:reagent-render (fn [] [:div [:svg {:width width :height height}]])
 
        :component-did-mount (fn []
-                              (println 1)
-                              (d3-render width height data))
+                              (d3-render data true))
 
        :component-did-update (fn [this]
-                               (println 2)
-                               (let [[_ data] (reagent/argv this)
-                                     d3data (clj->js data)]
-                                 (d3-render width height data)))})))
+                               (let [[_ data] (reagent/argv this)]
+                                 (d3-render data false)))})))
 
 (defn app []
   (let [data (subscribe [:search-result])]
