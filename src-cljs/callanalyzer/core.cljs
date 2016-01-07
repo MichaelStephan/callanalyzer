@@ -196,9 +196,7 @@
         bar-height (if (< c 50)
                      max-bar-height
                      min-bar-height)
-        height (if (= c 0)
-                 200
-                 (* c (+ bar-height bar-margin)))
+        height (+ 50 (* c (+ bar-height bar-margin)))
 
         min (apply min (map #(get-in % [:_source :message :timestamp]) data))
         max (apply max (map #(+ (get-in % [:_source :message :timestamp])
@@ -214,10 +212,13 @@
                 (outerTickSize 0))
         svg (.. js/d3
                 (select "svg"))]
-    (when new
+    (if new
       (.. svg
           (append "g")
           (attr "class" "data")))
+
+    (.. svg
+        (attr "height" height))
 
     (let [data-selection  (.. svg
                               (selectAll ".data")
@@ -259,7 +260,7 @@
       (.. svg
           (append "g")
           (attr "class" "x axis")
-          (attr "transform" (str "translate(0," height ")"))
+          (attr "transform" (str "translate(0," (- height 50)")"))
           (call xaxis)))))
 
 (defn d3-inner [data]
