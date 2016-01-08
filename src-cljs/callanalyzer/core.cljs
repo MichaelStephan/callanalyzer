@@ -53,6 +53,11 @@
 (defn start! []
   (start-router!))
 
+(defn show-login [] (dispatch [:show-login true]))
+(defn hide-login [] (dispatch [:show-login false]))
+(defn show-config [] (dispatch [:show-config true]))
+(defn hide-config [] (dispatch [:show-config false]))
+
 (defn ^:export login [user-id password]
   (sente/ajax-call login-endpoint {:method :post
                              :params     {:user-id  user-id
@@ -64,7 +69,10 @@
                          (= ?status 200) (if-let [{:keys [uid]}
                                                   (apply hash-map (some-> ?content
                                                                           reader/read-string))]
-                                           (sente/chsk-reconnect! chsk)
+                                           (do
+                                             (dispatch [:authenticated? true])
+                                             (hide-login)
+                                             (sente/chsk-reconnect! chsk))
                                            (throw "Login failed, invalid server response"))
                          (= ?status 403) (throw "Login denied, invalid credentials")
                          :else (throw "Loging failed, an unknown error occured"))
@@ -75,7 +83,8 @@
 (defn ^:export logout []
   (sente/ajax-call logout-endpoint {:method :post
                                     :timeout-ms 5000}
-                   (fn [_]))
+                   (fn [_]
+                     (dispatch [:authenticated? false])))
   nil)
 
 (defn ^:export search [option value]
@@ -109,7 +118,7 @@
           svri :search/vcap-request-id]
       [:a {:href "#"
            :class "list-group-item"}
-       [:h4 {:class "list-group-item-heading"} "Search by"]
+       [:h4 {:class "list-group-item-heading"} "Search by:"]
        [:div {:class "radio"}
         [:label [:input {:class "radio"
                          :type "radio" :name "option" :value "hybris-request-id"
@@ -142,11 +151,49 @@
                     :style {:width "100%"}}]]]
            [:div {:class "modal-footer"}]]]]))))
 
-(defn show-config []
-  (dispatch [:show-config true]))
-
-(defn hide-config []
-  (dispatch [:show-config false]))
+(defn ui-login []
+  (fn []
+    (let [config (subscribe [:show-login])]
+      (when @config
+        [:div {:class "modal show"
+               :tabIndex -1
+               :role "dialog"}
+         [:div {:class "modal-dialog"}
+          [:div {:class "modal-content"}
+           [:div {:class "modal-header"}
+            [:button {:type "button"
+                      :class "close"
+                      :data-dismiss "modal"
+                      :aria-label "Close"
+                      :on-click hide-login}
+             [:span {:aria-hidden "true"} "×"]]
+            [:h3 {:class "modal-title"} "Login"]]
+           [:div {:class "modal-body"}
+            [:form 
+             [:div {:class "form-group"}
+              [:label {:for "username"} "Username:"]
+              [:input {:id "username"
+                       :type "input"
+                       :class "form-control"
+                       :on-change #(dispatch [:username (-> % .-target .-value)])}]]
+             [:div {:class "form-group"}
+              [:label {:for "password"} "Password:"]
+              [:input {:id "password"
+                       :type "password"
+                       :class "form-control"
+                       :on-change #(dispatch [:password (-> % .-target .-value)])}]]]
+           [:div {:class "modal-footer"}
+            [:button {:type "button"
+                      :class "btn btn-primary"
+                      :data-dismiss "modal"
+                      :on-click (fn []
+                                  (let [username (subscribe [:username])
+                                        password (subscribe [:password])]
+                                    (login @username @password)))} "Login"]
+            [:button {:type "button"
+                      :class "btn btn-default"
+                      :data-dismiss "modal"
+                      :on-click hide-login} "Cancel"]]]]]]))))
 
 (defn ui-config []
   (fn []
@@ -161,7 +208,7 @@
             [:button {:type "button"
                       :class "close"
                       :data-dismiss "modal"
-                      :aria-label "close"
+                      :aria-label "Close"
                       :on-click hide-config}
              [:span {:aria-hidden "true"} "×"]]
             [:h3 {:class "modal-title"} "Config"]]
@@ -172,7 +219,7 @@
             [:button {:type "button"
                       :class "btn btn-default"
                       :data-dismiss "modal"
-                      :on-click hide-config} "close"]]]]]))))
+                      :on-click hide-config} "Close"]]]]]))))
 
 (defn ui-search []
        ; 
@@ -193,7 +240,7 @@
          [:span {:class "input-group-btn"}
           [:input {:class "btn btn-default"
                    :type "button"
-                   :value "search"
+                   :value "Search"
                    :on-click #(dispatch [:search])}]]
         ]]]
     ))
@@ -333,20 +380,28 @@
                                  (d3-render data false)))})))
 
 (defn ui-menu []
-  [:div {:class "row"}
-        [:div {:class "col-md-4 btn-group btn-group-xs"
-               :role "group"}
-         [:button {:type "button"
-                   :class "btn btn-link"} "login"]
-         [:button {:type "button"
-                   :class "btn btn-link"
-                   :on-click show-config} "config"]]])
+  (fn []
+    (let [authenticated? (subscribe [:authenticated?])]
+      [:div {:class "row"}
+            [:div {:class "col-md-4 btn-group btn-group-xs"
+                   :role "group"}
+             (if @authenticated?
+               [:button {:type "button"
+                         :class "btn btn-link"
+                         :on-click logout} "logout"]
+               [:button {:type "button"
+                         :class "btn btn-link"
+                         :on-click show-login} "login"])
+             [:button {:type "button"
+                       :class "btn btn-link"
+                       :on-click show-config} "config"]]])))
 
 (defn app []
   (let [data (subscribe [:search-result])]
     (fn []
       [:div {:class "container"} 
        [ui-search-status]
+       [ui-login]
        [ui-config]
        [ui-menu]
        [:div {:class "row"}
@@ -364,7 +419,10 @@
                          :status :idle
                          :result []}
                 :show {:login false
-                       :config false}})
+                       :config false}
+                :authentication {:credentials {:username ""
+                                               :password ""}
+                                 :authenticated? false}})
 
 (register-handler
   :initialize-db
@@ -377,49 +435,27 @@
       (search option term))
     db))
 
-(register-handler :search-status
-  (fn [db [_ status]]
-    (assoc-in db [:search :status] status)))
+(register-handler :search-status (fn [db [_ status]] (assoc-in db [:search :status] status)))
+(register-handler :search-term (fn [db [_ term]] (assoc-in db [:search :term] term)))
+(register-handler :search-option (fn [db [_ option]] (assoc-in db [:search :option] option)))
+(register-handler :search-result (fn [db [_ result]] (assoc-in db [:search :result] result)))
+(register-handler :show-config (fn [db [_ show]] (assoc-in db [:show :config] show)))
+(register-handler :show-login (fn [db [_ show]] (assoc-in db [:show :login] show)))
+(register-handler :show-login (fn [db [_ show]] (assoc-in db [:show :login] show)))
+(register-handler :reset (fn [db _] app-state))
+(register-handler :username (fn [db [_ username]] (assoc-in db [:authentication :credentials :username] username)))
+(register-handler :password (fn [db [_ password]] (assoc-in db [:authentication :credentials :password] password)))
+(register-handler :authenticated? (fn [db [_ authenticated]] (assoc-in db [:authentication :authenticated?] authenticated)))
 
-(register-handler :search-term
-  (fn [db [_ term]]
-    (assoc-in db [:search :term] term)))
-
-(register-handler :search-option
-  (fn [db [_ option]]
-    (assoc-in db [:search :option] option)))
-
-(register-handler :search-result
-  (fn [db [_ result]]
-    (assoc-in db [:search :result] result)))
-
-(register-handler :show-config
-  (fn [db [_ show]]
-    (assoc-in db [:show :config] show)))
-
-(register-handler :reset
-  (fn [db _]
-    app-state))
-
-(register-sub :search-option
-  (fn [db _]
-    (reaction (get-in @db [:search :option]))))
-
-(register-sub :search-status
-  (fn [db _]
-    (reaction (get-in @db [:search :status]))))
-
-(register-sub :search-term
-  (fn [db _]
-    (reaction (get-in @db [:search :term]))))
-
-(register-sub :search-result
-  (fn [db _]
-    (reaction (get-in @db [:search :result]))))
-
-(register-sub :show-config
-  (fn [db _]
-    (reaction (get-in @db [:show :config]))))
+(register-sub :search-option (fn [db _] (reaction (get-in @db [:search :option]))))
+(register-sub :search-status (fn [db _] (reaction (get-in @db [:search :status]))))
+(register-sub :search-term (fn [db _] (reaction (get-in @db [:search :term]))))
+(register-sub :search-result (fn [db _] (reaction (get-in @db [:search :result]))))
+(register-sub :show-config (fn [db _] (reaction (get-in @db [:show :config]))))
+(register-sub :show-login (fn [db _] (reaction (get-in @db [:show :login]))))
+(register-sub :username (fn [db _] (reaction (get-in @db [:authentication :credentials :username]))))
+(register-sub :password (fn [db _] (reaction (get-in @db [:authentication :credentials :password]))))
+(register-sub :authenticated? (fn [db _] (reaction (get-in @db [:authentication :authenticated?]))))
 
 (defn render-app []
   (r/render-component [app] (js/document.getElementById "app")))
