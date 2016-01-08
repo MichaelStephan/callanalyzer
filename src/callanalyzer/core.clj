@@ -13,6 +13,7 @@
 (defonce es-conn (atom nil))
 (def no-requestid-exception {:type :no-request-id :message "request-id not found"})
 (def multiple-request-ids-exception {:type :multiple-request-ids :message "multiple request-ids found"})
+(def max-vcap-ids-treshold 30)
 
 (defn make-es-conn [endpoint]
   (info "Creating elastichsearch pool connection")
@@ -91,7 +92,7 @@
   (info "Searching with dependencies (request-id):" query)
   (let [res1 (search* query)
         ids (get-vcap-request-ids res1)
-        res2 (if (<= (count ids) 30) ; discard details
+        res2 (if (<= (count max-vcap-ids-treshold) 30) ; discard details
                (search* {:field :vcap-request-ids :value ids})
                [])]
     (distinct (concat res1 res2))))

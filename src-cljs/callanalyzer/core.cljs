@@ -90,61 +90,113 @@
                                                    (js/alert (str "A technical error occured: " payload)))))
                                             (dispatch [:search-status :idle]))))
 
-(defn ui-header []
-  (fn []
-    [:div>h1 "YaaS Call Analyzer - alpha version"]))
-
 (defn ui-input []
   (fn []
-    (let [search-term (subscribe [:search-term])]
-      [:div
-       [:input {:type      "text"
-                :value     @search-term
-                :on-change #(dispatch [:search-term (-> % .-target .-value)])}]])))
+    (let [search-term (subscribe [:search-term])
+          option (subscribe [:search-option])]
+      [:input {:class "form-control" 
+               :placeholder (str "enter " (if (= @option :search/request-id)
+                                            "hybris-request-id"
+                                            "vcap-request-id"))
+               :type "text"
+               :value  @search-term
+               :on-change #(dispatch [:search-term (-> % .-target .-value)])}])))
 
 (defn ui-search-option []
   (fn []
     (let [option (subscribe [:search-option])
           sri :search/request-id
           svri :search/vcap-request-id]
-      [:div
-       [:label [:input {:type      "radio" :name "option" :value "request-id"
-                        :on-change #(dispatch [:search-option sri])
-                        :checked   (= @option sri)}] "request-id"]
-       [:label [:input {:type      "radio" :name "option" :value "vcap-request-id"
-                        :on-change #(dispatch [:search-option svri])
-                        :checked   (= @option svri)}] "vcap-request-id"]])))
-
-(defn ui-search-reset-button []
-  (fn []
-    [:div
-     [:input {:type     "button"
-              :value    "Reset"
-              :on-click #(dispatch [:reset])}]]))
-
-(defn ui-search-button []
-  (fn []
-    [:div
-     [:input {:type     "button"
-              :value    "Search"
-              :on-click #(dispatch [:search])}]]))
+      [:a {:href "#"
+           :class "list-group-item"}
+       [:h4 {:class "list-group-item-heading"} "Search by"]
+       [:div {:class "radio"}
+        [:label [:input {:class "radio"
+                         :type "radio" :name "option" :value "hybris-request-id"
+                         :on-change #(dispatch [:search-option sri])
+                         :checked (= @option sri)}] "hybris-request-id"]]
+       [:div {:class "radio"}
+        [:label [:input {:class "radio"
+                         :type "radio" :name "option" :value "vcap-request-id"
+                         :on-change #(dispatch [:search-option svri])
+                         :checked   (= @option svri)}] "vcap-request-id"]]])))
 
 (defn ui-search-status []
   (fn []
     (let [status (subscribe [:search-status])]
-      [:p (case @status
-            :idle "idle"
-            :searching "searching"
-            :default "unknown")])))
+      (when (= @status :searching)
+        [:div {:class "modal show"
+               :tabIndex -1
+               :role "dialog"}
+         [:div {:class "modal-dialog"}
+          [:div {:class "modal-content"}
+           [:div {:class "modal-header"}
+            [:h3 {:class "modal-title"} "Searching ..."]]
+           [:div {:class "modal-body"}
+            [:div {:class "progress"}
+             [:div {:class "progress-bar progress-bar-striped active"
+                    :role "progressbar"
+                    :aria-valuenow "45"
+                    :aria-valuemin "0"
+                    :aria-valuemax "100"
+                    :style {:width "100%"}}]]]
+           [:div {:class "modal-footer"}]]]]))))
+
+(defn show-config []
+  (dispatch [:show-config true]))
+
+(defn hide-config []
+  (dispatch [:show-config false]))
+
+(defn ui-config []
+  (fn []
+    (let [config (subscribe [:show-config])]
+      (when @config
+        [:div {:class "modal show"
+               :tabIndex -1
+               :role "dialog"}
+         [:div {:class "modal-dialog"}
+          [:div {:class "modal-content"}
+           [:div {:class "modal-header"}
+            [:button {:type "button"
+                      :class "close"
+                      :data-dismiss "modal"
+                      :aria-label "close"
+                      :on-click hide-config}
+             [:span {:aria-hidden "true"} "×"]]
+            [:h3 {:class "modal-title"} "Config"]]
+           [:div {:class "modal-body"}
+            [:div {:class "list-group"}
+             [ui-search-option]]]
+           [:div {:class "modal-footer"}
+            [:button {:type "button"
+                      :class "btn btn-default"
+                      :data-dismiss "modal"
+                      :on-click hide-config} "close"]]]]]))))
 
 (defn ui-search []
+       ; 
+       ; [ui-search-option]
+  
+  
+         #_[:input {:class "btn btn-default dropdown-toggle"
+                  :type "button"
+                  :value "Reset"
+                  :on-click #(dispatch [:reset])}]
+
   (fn [] 
-      [:div
-       [ui-input]
-       [ui-search-status]
-       [ui-search-option]
-       [ui-search-button]
-       [ui-search-reset-button]]))
+      [:div {:class "row"}
+       [:div {:class "col-md-4 col-md-offset-4"}
+        [:div {:class "input-group" :style {:margin-left "20px"
+                                            :width "27em"}}
+         [ui-input]
+         [:span {:class "input-group-btn"}
+          [:input {:class "btn btn-default"
+                   :type "button"
+                   :value "search"
+                   :on-click #(dispatch [:search])}]]
+        ]]]
+    ))
 
 (defn ui-app [i]
   [:ul (for [j (:nested i)]
@@ -232,6 +284,11 @@
       (.. data-selection 
           enter
           (append "g")
+          (on "click"
+              (fn [] (this-as self (..
+                                     (js/d3.select self)
+                                     (selectAll "rect")
+                                     (attr "fill" "black")))))
           (attr "transform"
                 (fn [d, i]
                   (str "translate(0," (* i (+ bar-height bar-margin)) ")")))
@@ -260,31 +317,43 @@
       (.. svg
           (append "g")
           (attr "class" "x axis")
-          (attr "transform" (str "translate(0," (- height 50)")"))
+          (attr "transform" (str "translate(0," (- height 40)")"))
           (call xaxis)))))
 
 (defn d3-inner [data]
   (let [width 1024 
         height 600]
-   (reagent/create-class
-      {:reagent-render (fn [] [:div [:svg {:width width :height height}]])
-
+    (reagent/create-class
+      {:reagent-render (fn []
+                         [:div [:svg {:width width :height height}]])
        :component-did-mount (fn []
                               (d3-render data true))
-
        :component-did-update (fn [this]
                                (let [[_ data] (reagent/argv this)]
                                  (d3-render data false)))})))
 
+(defn ui-menu []
+  [:div {:class "row"}
+        [:div {:class "col-md-4 btn-group btn-group-xs"
+               :role "group"}
+         [:button {:type "button"
+                   :class "btn btn-link"} "login"]
+         [:button {:type "button"
+                   :class "btn btn-link"
+                   :on-click show-config} "config"]]])
+
 (defn app []
   (let [data (subscribe [:search-result])]
     (fn []
-      [:div
-        [:div
-          [:div
-           [ui-header]
-           [ui-search]
-           [ui-search-results]]]
+      [:div {:class "container"} 
+       [ui-search-status]
+       [ui-config]
+       [ui-menu]
+       [:div {:class "row"}
+        [:div {:class "col-md-6 col-md-offset-4"}
+        [:h1 "YaaS Call Analyzer - v1.0"]]]
+       [ui-search]
+       [ui-search-results]
        [:div
         [:div
          [d3-inner @data]
@@ -293,7 +362,9 @@
 (def app-state {:search {:term ""
                          :option :search/request-id 
                          :status :idle
-                         :result []}})
+                         :result []}
+                :show {:login false
+                       :config false}})
 
 (register-handler
   :initialize-db
@@ -322,6 +393,10 @@
   (fn [db [_ result]]
     (assoc-in db [:search :result] result)))
 
+(register-handler :show-config
+  (fn [db [_ show]]
+    (assoc-in db [:show :config] show)))
+
 (register-handler :reset
   (fn [db _]
     app-state))
@@ -341,6 +416,10 @@
 (register-sub :search-result
   (fn [db _]
     (reaction (get-in @db [:search :result]))))
+
+(register-sub :show-config
+  (fn [db _]
+    (reaction (get-in @db [:show :config]))))
 
 (defn render-app []
   (r/render-component [app] (js/document.getElementById "app")))
