@@ -130,6 +130,9 @@
                          :on-change #(dispatch [:search-option svri])
                          :checked   (= @option svri)}] "vcap-request-id"]]])))
 
+(defn hide-search-status []
+  (dispatch [:search-status :idle]))
+
 (defn ui-search-status []
   (fn []
     (let [status (subscribe [:search-status])]
@@ -140,6 +143,12 @@
          [:div {:class "modal-dialog"}
           [:div {:class "modal-content"}
            [:div {:class "modal-header"}
+            [:button {:type "button"
+                      :on-click hide-search-status 
+                      :class "close"
+                      :data-dismiss "modal"
+                      :aria-label "Close"}
+             [:span {:aria-hidden "true"} "×"]]
             [:h3 {:class "modal-title"} "Searching ..."]]
            [:div {:class "modal-body"}
             [:div {:class "progress"}
@@ -149,7 +158,11 @@
                     :aria-valuemin "0"
                     :aria-valuemax "100"
                     :style {:width "100%"}}]]]
-           [:div {:class "modal-footer"}]]]]))))
+           [:div {:class "modal-footer"}
+            [:button {:type "button"
+                      :class "btn btn-default"
+                      :data-dismiss "modal"
+                      :on-click hide-search-status} "Cancel"]]]]]))))
 
 (defn ui-login []
   (fn []
@@ -222,15 +235,6 @@
                       :on-click hide-config} "Close"]]]]]))))
 
 (defn ui-search []
-       ; 
-       ; [ui-search-option]
-  
-  
-         #_[:input {:class "btn btn-default dropdown-toggle"
-                  :type "button"
-                  :value "Reset"
-                  :on-click #(dispatch [:reset])}]
-
   (fn [] 
       [:div {:class "row"}
        [:div {:class "col-md-4 col-md-offset-4"}
@@ -250,26 +254,42 @@
          ^{:key (gensym)} [:li (let [s (:_source j) m (:message s) l (:log m)]
                                  (str (:level m) ": " (:message l) (if-let [st (:stacktrace l)] st)))])])
 
-(defn get-timestamp [log]
-  {:pre [log]}
-  (or (-> log :_source :message :timestamp)
-      (-> log :_source :timestamp)))
-
 (defn ui-rtr [i]
-  ^{:key (gensym)} [:li (let [hop (:hop i) s (:_source i) m (:message s)]
-                          (str (get-timestamp i) " " (cstr/join (repeatedly (if (number? hop)
-                                                                           hop
-                                                                           0)
-                                                                         (fn [] "-") ))
-                               "> " (:client i) " call " (:service i) "|" (:request m) " (" (:response m) "/" (* 1000.0 (:response_time m)) ")"))
-                    (ui-app i)])
+  (let [hop (:hop i) s (:_source i) m (:message s)]
+    [:tr {:key (gensym)} 
+     [:td (.. (js/Date. (/ (:timestamp m) 1000000)) toTimeString)]
+     [:td (:response m)]
+     [:td (.. (* 1000.0 (:response_time m)) (toFixed 2))]
+     ; [:td "TODO"]
+     [:td hop]
+     [:td (or (:client i) "-")]
+     [:td (or (:service i) "-")]
+     [:td (:verb m)]
+     [:td (:request m)]
+     [:td (:space m)]]))
 
 (defn ui-search-results []
   (fn []
     (let [results (subscribe [:search-result])]
-      [:div "Search results:"
-       [:div ^{:key (gensym)} [:ul (for [i @results]
-                                     (ui-rtr i))]]])))
+      (when-not (empty? @results)
+        [:div {:class "row" :style {:margin-top "20px"}}
+          [:div {:class "col-md-12"}
+           [:table {:class "table table-hover table-condensed table-striped"}
+            [:body
+            [:thead
+             [:th "Timestamp"]
+             [:th "Status"]
+             [:th "Duration (msecs)"]
+             ; [:th "Duration (%)"]
+             [:th "Hop"]
+             [:th "Client"]
+             [:th "Service"]
+             [:th "Verb"]
+             [:th "Request"]
+             [:th "Owner"]]
+             [:body
+               (for [i @results]
+                 (ui-rtr i))]]]]]))))
 
 (defn sec->psec [sec]
   (* 1000000000 sec))
@@ -440,7 +460,6 @@
 (register-handler :search-option (fn [db [_ option]] (assoc-in db [:search :option] option)))
 (register-handler :search-result (fn [db [_ result]] (assoc-in db [:search :result] result)))
 (register-handler :show-config (fn [db [_ show]] (assoc-in db [:show :config] show)))
-(register-handler :show-login (fn [db [_ show]] (assoc-in db [:show :login] show)))
 (register-handler :show-login (fn [db [_ show]] (assoc-in db [:show :login] show)))
 (register-handler :reset (fn [db _] app-state))
 (register-handler :username (fn [db [_ username]] (assoc-in db [:authentication :credentials :username] username)))
