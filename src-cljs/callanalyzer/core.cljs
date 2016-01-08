@@ -254,20 +254,6 @@
          ^{:key (gensym)} [:li (let [s (:_source j) m (:message s) l (:log m)]
                                  (str (:level m) ": " (:message l) (if-let [st (:stacktrace l)] st)))])])
 
-(defn ui-rtr [i]
-  (let [hop (:hop i) s (:_source i) m (:message s)]
-    [:tr {:key (gensym)} 
-     [:td (.. (js/Date. (/ (:timestamp m) 1000000)) toTimeString)]
-     [:td (:response m)]
-     [:td (.. (* 1000.0 (:response_time m)) (toFixed 2))]
-     ; [:td "TODO"]
-     [:td hop]
-     [:td (or (:client i) "-")]
-     [:td (or (:service i) "-")]
-     [:td (:verb m)]
-     [:td (:request m)]
-     [:td (:space m)]]))
-
 (defn ui-search-results []
   (fn []
     (let [results (subscribe [:search-result])]
@@ -275,7 +261,6 @@
         [:div {:class "row" :style {:margin-top "20px"}}
           [:div {:class "col-md-12"}
            [:table {:class "table table-hover table-condensed table-striped"}
-            [:body
             [:thead
              [:th "Timestamp"]
              [:th "Status"]
@@ -287,9 +272,20 @@
              [:th "Verb"]
              [:th "Request"]
              [:th "Owner"]]
-             [:body
+             [:tbody
                (for [i @results]
-                 (ui-rtr i))]]]]]))))
+                 (let [hop (:hop i) s (:_source i) m (:message s)]
+                   [:tr {:key (gensym)}
+                    [:td (.. (js/Date. (/ (:timestamp m) 1000000)) toTimeString)]
+                    [:td (:response m)]
+                    [:td (.. (* 1000.0 (:response_time m)) (toFixed 2))]
+                    ; [:td "TODO"]
+                    [:td hop]
+                    [:td (or (:client i) "-")]
+                    [:td (or (:service i) "-")]
+                    [:td (:verb m)]
+                    [:td (:request m)]
+                    [:td (:space m)]]))]]]]))))
 
 (defn sec->psec [sec]
   (* 1000000000 sec))
