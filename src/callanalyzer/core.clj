@@ -92,7 +92,7 @@
   (info "Searching with dependencies (request-id):" query)
   (let [res1 (search* query)
         ids (get-vcap-request-ids res1)
-        res2 (if (<= (count max-vcap-ids-treshold) 30) ; discard details
+        res2 (if (<= (count ids) max-vcap-ids-treshold) ; discard details
                (search* {:field :vcap-request-ids :value ids})
                [])]
     (distinct (concat res1 res2))))
